@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ragsearch
+      POSTGRES_USER: ragsearch
+      POSTGRES_PASSWORD: ragsearch
+    ports:
+      - "5432:5432"
+    volumes:
+      - ragsearch_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ragsearch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+    volumes:
+      - ragsearch_n8n:/home/node/.n8n
+
+volumes:
+  ragsearch_pgdata:
+  ragsearch_n8n:

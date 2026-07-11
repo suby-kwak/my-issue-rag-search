@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: ragSearch
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ragsearch
+    username: ragsearch
+    password: ragsearch
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      embedding:
+        options:
+          model: text-embedding-3-small
+      chat:
+        options:
+          model: gpt-4o-mini
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1536
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
+
+rag:
+  query:
+    top-k: 5
