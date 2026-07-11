@@ -13,7 +13,7 @@ spring:
           model: nomic-embed-text
       chat:
         options:
-          model: llama3.2
+          model: qwen2.5:14b
     vectorstore:
       pgvector:
         initialize-schema: true
