@@ -36,6 +36,11 @@ out/
 ### VS Code ###
 .vscode/
 
+### Secrets ###
+.env
+.env.*
+!.env.example
+
 ### claude-hermes runtime state ###
 .claude/hermes/logs/
 .claude/hermes/daemon.pid
@@ -44,3 +49,4 @@ out/
 .claude/hermes/state.db
 .claude/hermes/state.db-shm
 .claude/hermes/state.db-wal
+.claude/scheduled_tasks.lock

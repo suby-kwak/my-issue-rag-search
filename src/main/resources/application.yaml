@@ -6,18 +6,18 @@ spring:
     username: ragsearch
     password: ragsearch
   ai:
-    openai:
-      api-key: ${OPENAI_API_KEY}
+    ollama:
+      base-url: http://localhost:11434
       embedding:
         options:
-          model: text-embedding-3-small
+          model: nomic-embed-text
       chat:
         options:
-          model: gpt-4o-mini
+          model: llama3.2
     vectorstore:
       pgvector:
         initialize-schema: true
-        dimensions: 1536
+        dimensions: 768
         distance-type: COSINE_DISTANCE
         index-type: HNSW
 

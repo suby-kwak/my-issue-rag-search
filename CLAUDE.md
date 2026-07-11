@@ -19,7 +19,7 @@ Current state: Phase 0–2 of the plan's roadmap are done — local infra (Postg
 
 Toolchain: Java 26 (via Gradle toolchain, see `build.gradle`; `settings.gradle` has the foojay resolver so Gradle auto-downloads it if not installed — Gradle itself still needs a JVM 17+ on `JAVA_HOME`/`PATH` to run at all). Spring Boot 4.1.0, Spring AI 2.0.0 BOM, group `com.example`, root package `com.example.ragsearch`.
 
-Required env var: `OPENAI_API_KEY` (used for both the embedding model and chat model — see `application.yaml`). The app builds and the context-load test passes without a real key, but `/api/ingest` and `/api/query` will fail their OpenAI calls without one. Local datasource credentials (`ragsearch`/`ragsearch`) are hardcoded in `application.yaml` and only valid against the Docker Compose Postgres — not a production secret.
+Embedding and chat models run locally via Ollama (`http://localhost:11434`, see `application.yaml`) — no API key required. Requires `ollama pull nomic-embed-text` (embedding, 768 dims) and `ollama pull llama3.2` (chat) once, and the Ollama service running, before `/api/ingest`/`/api/query` will work. Local datasource credentials (`ragsearch`/`ragsearch`) are hardcoded in `application.yaml` and only valid against the Docker Compose Postgres — not a production secret.
 
 ## Architecture
 
@@ -33,7 +33,7 @@ External automation (n8n) is meant to be the integration hub — it owns all web
 
 **Component boundaries:**
 - `com.example.ragsearch.common.DocumentMetadata` holds the metadata key constants (`source`, `sourceId`, `title`, `url`) shared between ingest (writes them) and query (reads them back for source attribution) — keep both sides using these constants rather than string literals so they can't drift.
-- Spring AI's `VectorStore`/`EmbeddingModel`/`ChatModel` beans are auto-configured by the `spring-ai-starter-model-openai` and `spring-ai-starter-vector-store-pgvector` starters from `application.yaml` — there's no manual `@Configuration` for them. `spring.ai.vectorstore.pgvector.initialize-schema: true` means the `vector_store` table/HNSW index are created automatically on startup; there's no separate migration.
+- Spring AI's `VectorStore`/`EmbeddingModel`/`ChatModel` beans are auto-configured by the `spring-ai-starter-model-ollama` and `spring-ai-starter-vector-store-pgvector` starters from `application.yaml` — there's no manual `@Configuration` for them. `spring.ai.vectorstore.pgvector.initialize-schema: true` means the `vector_store` table/HNSW index are created automatically on startup; there's no separate migration. The pgvector column dimension (`spring.ai.vectorstore.pgvector.dimensions: 768`) must match the active embedding model's output size (`nomic-embed-text` = 768) — changing embedding models later means dropping and letting `vector_store` be recreated, not just editing the config.
 - Kakao's chatbot skill server enforces a 5-second response timeout, which the query path (embedding + vector search + LLM call) will likely exceed once built — that integration needs an async/callback design (Phase 5, not started), not a synchronous n8n call. Slack has no such constraint, which is why Slack is the next messenger integration and Kakao is last.
 
 **Not yet built** (per the plan's roadmap, in order): n8n workflow wiring GitHub webhooks → `/api/ingest`; Slack slash command/mention → `/api/query` → Slack; Notion ingest; Kakao integration.
