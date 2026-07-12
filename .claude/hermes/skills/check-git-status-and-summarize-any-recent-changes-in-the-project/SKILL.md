@@ -6,4 +6,4 @@ Captured from a successful trajectory: Check git status and summarize any recent
 - (no tools recorded)
 
 ## Example reply
-All quiet — no git repo in `C:\Project\ragSearch`. This has been the case for a lot of consecutive checks now; if this heartbeat is meant to watch for git activity here, you may want to `git init`
+All quiet — still no git repo in `C:\Project\ragSearch`. Same suggestion stands whenever you want to act on it: `git init` or dial back this heartbeat's interval.
