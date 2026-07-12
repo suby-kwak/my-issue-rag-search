@@ -1,0 +1,96 @@
+{
+  "name": "GitHub Issue -> /api/ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "github-issue",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "1f8f6c1a-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 0],
+      "webhookId": "github-issue-ingest"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{$json.body.action}}",
+              "rightValue": "^(opened|edited|reopened)$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1f8f6c1a-0000-4000-8000-000000000002",
+      "name": "Is relevant issue action?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [20, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "a1", "name": "source", "type": "string", "value": "github" },
+            { "id": "a2", "name": "sourceId", "type": "string", "value": "={{$json.body.repository.full_name}}#{{$json.body.issue.number}}" },
+            { "id": "a3", "name": "title", "type": "string", "value": "={{$json.body.issue.title}}" },
+            { "id": "a4", "name": "url", "type": "string", "value": "={{$json.body.issue.html_url}}" },
+            { "id": "a5", "name": "content", "type": "string", "value": "={{$json.body.issue.body}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f8f6c1a-0000-4000-8000-000000000003",
+      "name": "Build ingest payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8080/api/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { source: $json.source, sourceId: $json.sourceId, title: $json.title, url: $json.url, content: $json.content } }}",
+        "options": {}
+      },
+      "id": "1f8f6c1a-0000-4000-8000-000000000004",
+      "name": "POST /api/ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, -80]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Is relevant issue action?", "type": "main", "index": 0 }]]
+    },
+    "Is relevant issue action?": {
+      "main": [
+        [{ "node": "Build ingest payload", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Build ingest payload": {
+      "main": [[{ "node": "POST /api/ingest", "type": "main", "index": 0 }]]
+    }
+  }
+}

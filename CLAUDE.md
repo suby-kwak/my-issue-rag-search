@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal RAG-based knowledge search system: automatically ingests GitHub issues and Notion notes, embeds them into a vector store, and answers natural-language questions (asked via Slack/KakaoTalk) using retrieval-augmented generation. Full design is in `나만의_RAG_이슈요약검색기_계획서.md` — read it for scenario-level detail beyond the summary below.
 
-Current state: Phase 0–2 of the plan's roadmap are done — local infra (Postgres+pgvector, n8n) via `docker-compose.yml`, and both `/api/ingest` and `/api/query` are implemented against Spring AI + pgvector. GitHub/Notion webhook wiring in n8n and the Slack/Kakao messenger integrations (Phase 3+) are not built yet.
+Current state: Phase 0–3 of the plan's roadmap are done — local infra (Postgres+pgvector, n8n) via `docker-compose.yml`, `/api/ingest` and `/api/query` implemented against Spring AI + pgvector, and an n8n workflow (`n8n/github-issue-ingest.workflow.json`) wiring GitHub issue webhooks to `/api/ingest`. The workflow is verified against simulated GitHub payloads via n8n's test webhook; it is not yet wired to a real GitHub repo webhook (would need ngrok or similar to expose local n8n). Slack/Kakao messenger integrations (Phase 4+) are not built yet.
 
 ## Commands
 
@@ -23,7 +23,7 @@ Embedding and chat models run locally via Ollama (`http://localhost:11434`, see 
 
 ## Architecture
 
-External automation (n8n) is meant to be the integration hub — it owns all webhook/polling/messenger plumbing and talks to this Spring Boot app only through two HTTP endpoints. This app itself never calls GitHub/Notion/Slack/Kakao APIs directly. n8n workflows themselves are not part of this repo (Phase 3+, not yet built).
+External automation (n8n) is meant to be the integration hub — it owns all webhook/polling/messenger plumbing and talks to this Spring Boot app only through two HTTP endpoints. This app itself never calls GitHub/Notion/Slack/Kakao APIs directly. n8n workflow exports live under `n8n/` in this repo (e.g. `n8n/github-issue-ingest.workflow.json`) and are imported into the n8n UI manually — n8n itself has no CLI-driven deploy step here.
 
 **Data flow (implemented):**
 - Ingest: `POST /api/ingest` {source, sourceId, title, url, content} (`IngestController` → `IngestService`) → delete any existing pgvector chunks for that `(source, sourceId)` via `FilterExpressionBuilder` → split content with `TokenTextSplitter` → `VectorStore.add(chunks)` (embeds + stores in one call). This is how re-ingesting an edited issue/note upserts instead of duplicating.
@@ -36,4 +36,6 @@ External automation (n8n) is meant to be the integration hub — it owns all web
 - Spring AI's `VectorStore`/`EmbeddingModel`/`ChatModel` beans are auto-configured by the `spring-ai-starter-model-ollama` and `spring-ai-starter-vector-store-pgvector` starters from `application.yaml` — there's no manual `@Configuration` for them. `spring.ai.vectorstore.pgvector.initialize-schema: true` means the `vector_store` table/HNSW index are created automatically on startup; there's no separate migration. The pgvector column dimension (`spring.ai.vectorstore.pgvector.dimensions: 768`) must match the active embedding model's output size (`nomic-embed-text` = 768) — changing embedding models later means dropping and letting `vector_store` be recreated, not just editing the config.
 - Kakao's chatbot skill server enforces a 5-second response timeout, which the query path (embedding + vector search + LLM call) will likely exceed once built — that integration needs an async/callback design (Phase 5, not started), not a synchronous n8n call. Slack has no such constraint, which is why Slack is the next messenger integration and Kakao is last.
 
-**Not yet built** (per the plan's roadmap, in order): n8n workflow wiring GitHub webhooks → `/api/ingest`; Slack slash command/mention → `/api/query` → Slack; Notion ingest; Kakao integration.
+**n8n workflow (`n8n/github-issue-ingest.workflow.json`):** `Webhook` node (path `github-issue`) → `IF` node filtering GitHub `issues` events to `action` in `opened`/`edited`/`reopened` (regex `^(opened|edited|reopened)$` — not a comma-separated list, n8n's IF regex operator doesn't do OR-by-comma) → `Set` node mapping the GitHub payload to `{source: "github", sourceId: "<owner>/<repo>#<issue number>", title, url, content: issue body}` → `HTTP Request` node `POST`ing to `http://host.docker.internal:8080/api/ingest` (n8n runs in Docker, so it must reach the host's Spring Boot process via `host.docker.internal`, not `localhost`). Verified end-to-end using n8n's test webhook with a simulated GitHub payload, not yet against a real GitHub repo webhook.
+
+**Not yet built** (per the plan's roadmap, in order): real GitHub repo webhook → local n8n (needs ngrok or similar tunnel); Slack slash command/mention → `/api/query` → Slack; Notion ingest; Kakao integration.
