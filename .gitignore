@@ -36,6 +36,9 @@ out/
 ### VS Code ###
 .vscode/
 
+### Node (discord-bot) ###
+node_modules/
+
 ### Secrets ###
 .env
 .env.*

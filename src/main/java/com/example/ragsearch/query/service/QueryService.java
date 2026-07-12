@@ -20,6 +20,7 @@ public class QueryService {
     private static final String PROMPT_TEMPLATE = """
             Answer the question using only the context below. If the context does not contain
             the answer, say you don't have a record of it. Do not use outside knowledge.
+            Always answer in Korean, regardless of the language of the context.
 
             Context:
             %s
