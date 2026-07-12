@@ -1,0 +1,129 @@
+{
+  "name": "Notion Notes -> /api/ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000001",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-800, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n// First run has no checkpoint yet, so default far enough back to backfill\n// all existing notes; every run after that only looks since the last check.\nconst since = staticData.lastCheckedIso || new Date(Date.now() - 10 * 365 * 24 * 60 * 60 * 1000).toISOString();\nstaticData.lastCheckedIso = new Date().toISOString();\nreturn [{ json: { since } }];"
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000002",
+      "name": "Get last checked time",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-580, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/1b2a185f-8e0a-80ac-8ce8-d6c3b745911d/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { filter: { timestamp: \"last_edited_time\", last_edited_time: { on_or_after: $json.since } } } }}",
+        "options": {}
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000003",
+      "name": "Query database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-360, 0],
+      "credentials": {
+        "httpHeaderAuth": { "id": "", "name": "Notion Header Auth" }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000004",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-140, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.notion.com/v1/blocks/{{$json.id}}/children?page_size=100",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Notion-Version", "value": "2022-06-28" }]
+        },
+        "options": {}
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000005",
+      "name": "Get page blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [80, 0],
+      "credentials": {
+        "httpHeaderAuth": { "id": "", "name": "Notion Header Auth" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const page = $('Split Out').item.json;\nconst blocks = $input.item.json.results || [];\n\nfunction textOf(block) {\n  const rt = block[block.type] && block[block.type].rich_text;\n  if (!rt) return '';\n  return rt.map(t => t.plain_text).join('');\n}\n\nconst content = blocks.map(textOf).filter(Boolean).join('\\n') || '(내용 없음)';\nconst title = (page.properties['제목'] && page.properties['제목'].title && page.properties['제목'].title[0] && page.properties['제목'].title[0].plain_text) || '(제목 없음)';\n\nreturn {\n  json: {\n    source: 'notion',\n    sourceId: page.id,\n    title,\n    url: page.url,\n    content\n  }\n};"
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000006",
+      "name": "Build ingest payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8080/api/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { source: $json.source, sourceId: $json.sourceId, title: $json.title, url: $json.url, content: $json.content } }}",
+        "options": {}
+      },
+      "id": "2f9f6c1a-0000-4000-8000-000000000007",
+      "name": "POST /api/ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 0]
+    }
+  ],
+  "connections": {
+    "Every 5 min": {
+      "main": [[{ "node": "Get last checked time", "type": "main", "index": 0 }]]
+    },
+    "Get last checked time": {
+      "main": [[{ "node": "Query database", "type": "main", "index": 0 }]]
+    },
+    "Query database": {
+      "main": [[{ "node": "Split Out", "type": "main", "index": 0 }]]
+    },
+    "Split Out": {
+      "main": [[{ "node": "Get page blocks", "type": "main", "index": 0 }]]
+    },
+    "Get page blocks": {
+      "main": [[{ "node": "Build ingest payload", "type": "main", "index": 0 }]]
+    },
+    "Build ingest payload": {
+      "main": [[{ "node": "POST /api/ingest", "type": "main", "index": 0 }]]
+    }
+  }
+}
