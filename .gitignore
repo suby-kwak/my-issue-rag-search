@@ -51,5 +51,8 @@ out/
 .claude/hermes/state.db-wal
 .claude/scheduled_tasks.lock
 
+### claude-hermes settings (contains live bot tokens) ###
+.claude/hermes/settings.json
+
 ### Claude Code personal settings ###
 .claude/settings.local.json
