@@ -50,3 +50,6 @@ out/
 .claude/hermes/state.db-shm
 .claude/hermes/state.db-wal
 .claude/scheduled_tasks.lock
+
+### Claude Code personal settings ###
+.claude/settings.local.json
